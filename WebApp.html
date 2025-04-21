@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Mini Wordle</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: #121213;
+      color: #fff;
+      margin: 0;
+      padding: 20px;
+    }
+
+    h1 {
+      color: #6aaa64;
+    }
+
+    .board {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: center;
+      margin-top: 20px;
+    }
+
+    .row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .tile {
+      width: 60px;
+      height: 60px;
+      border: 2px solid #3a3a3c;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      text-transform: uppercase;
+      font-weight: bold;
+      background: #121213;
+      color: #fff;
+      transition: background-color 0.3s ease;
+    }
+
+    .correct {
+      background-color: #538d4e;
+      border-color: #538d4e;
+    }
+
+    .present {
+      background-color: #b59f3b;
+      border-color: #b59f3b;
+    }
+
+    .absent {
+      background-color: #3a3a3c;
+      border-color: #3a3a3c;
+    }
+
+    .keyboard {
+      margin-top: 30px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .keyboard-row {
+      display: flex;
+      gap: 6px;
+    }
+
+    .key {
+      padding: 10px 14px;
+      font-size: 1rem;
+      background-color: #818384;
+      border: none;
+      border-radius: 5px;
+      color: white;
+      cursor: pointer;
+      text-transform: uppercase;
+      font-weight: bold;
+      transition: background-color 0.2s ease;
+    }
+
+    .key.correct {
+      background-color: #538d4e;
+    }
+
+    .key.present {
+      background-color: #b59f3b;
+    }
+
+    .key.absent {
+      background-color: #3a3a3c;
+    }
+
+    #message {
+      margin-top: 20px;
+      font-size: 1.2rem;
+    }
+
+    #play-again {
+      display: none;
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 1rem;
+      background-color: #6aaa64;
+      border: none;
+      border-radius: 5px;
+      color: white;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>Mini Wordle</h1>
+  <div id="game" class="board"></div>
+  <div class="keyboard" id="keyboard"></div>
+  <div id="message"></div>
+  <button id="play-again">Play Again</button>
+
+  <script>
+    const WORDS = ["apple", "crane", "grape", "spine", "light", "bread"];
+    let solution = WORDS[Math.floor(Math.random() * WORDS.length)].toUpperCase();
+    const maxGuesses = 6;
+    let currentGuess = 0;
+    let currentLetters = [];
+
+    const gameBoard = document.getElementById("game");
+    const rows = [];
+
+    const playAgainBtn = document.getElementById("play-again");
+
+    // Build the board
+    for (let i = 0; i < maxGuesses; i++) {
+      const row = document.createElement("div");
+      row.classList.add("row");
+      let tiles = [];
+      for (let j = 0; j < 5; j++) {
+        const tile = document.createElement("div");
+        tile.classList.add("tile");
+        row.appendChild(tile);
+        tiles.push(tile);
+      }
+      gameBoard.appendChild(row);
+      rows.push(tiles);
+    }
+
+    // Build keyboard
+    const keyboardLayout = [
+      ["q","w","e","r","t","y","u","i","o","p"],
+      ["a","s","d","f","g","h","j","k","l"],
+      ["Enter","z","x","c","v","b","n","m","←"]
+    ];
+
+    const keyboard = document.getElementById("keyboard");
+
+    keyboardLayout.forEach(row => {
+      const rowDiv = document.createElement("div");
+      rowDiv.classList.add("keyboard-row");
+      row.forEach(key => {
+        const button = document.createElement("button");
+        button.textContent = key;
+        button.classList.add("key");
+        button.onclick = () => handleKey(key);
+        rowDiv.appendChild(button);
+      });
+      keyboard.appendChild(rowDiv);
+    });
+
+    function handleKey(key) {
+      if (currentGuess >= maxGuesses) return;
+
+      if (key === "Enter") {
+        if (currentLetters.length < 5) {
+          showMessage("Not enough letters");
+          return;
+        }
+        submitGuess(currentLetters.join("").toUpperCase());
+      } else if (key === "←") {
+        if (currentLetters.length > 0) {
+          currentLetters.pop();
+          updateTiles();
+        }
+      } else if (currentLetters.length < 5 && /^[a-z]$/i.test(key)) {
+        currentLetters.push(key.toUpperCase());
+        updateTiles();
+      }
+    }
+
+    function updateTiles() {
+      const tiles = rows[currentGuess];
+      tiles.forEach((tile, i) => {
+        tile.textContent = currentLetters[i] || "";
+      });
+    }
+
+    function submitGuess(guess) {
+      const tiles = rows[currentGuess];
+      const letterCount = {};
+
+      for (let letter of solution) {
+        letterCount[letter] = (letterCount[letter] || 0) + 1;
+      }
+
+      // First pass: correct letters
+      for (let i = 0; i < 5; i++) {
+        tiles[i].textContent = guess[i];
+        if (guess[i] === solution[i]) {
+          tiles[i].classList.add("correct");
+          markKey(guess[i], "correct");
+          letterCount[guess[i]]--;
+        }
+      }
+
+      // Second pass: present and absent letters
+      for (let i = 0; i < 5; i++) {
+        if (guess[i] !== solution[i]) {
+          if (solution.includes(guess[i]) && letterCount[guess[i]] > 0) {
+            tiles[i].classList.add("present");
+            markKey(guess[i], "present");
+            letterCount[guess[i]]--;
+          } else {
+            tiles[i].classList.add("absent");
+            markKey(guess[i], "absent");
+          }
+        }
+      }
+
+      if (guess === solution) {
+        showMessage("🎉 You got it!");
+        disableKeyboard();
+        return;
+      }
+
+      currentGuess++;
+      currentLetters = [];
+
+      if (currentGuess === maxGuesses) {
+        showMessage(`😢 The word was: ${solution}`);
+        disableKeyboard();
+      }
+    }
+
+    function markKey(letter, status) {
+      const allKeys = document.querySelectorAll(".key");
+      allKeys.forEach(key => {
+        if (key.textContent.toUpperCase() === letter) {
+          if (!key.classList.contains("correct")) {
+            key.classList.remove("present", "absent");
+            key.classList.add(status);
+          }
+        }
+      });
+    }
+
+    function showMessage(msg) {
+      document.getElementById("message").textContent = msg;
+      playAgainBtn.style.display = "inline-block";
+    }
+
+    function disableKeyboard() {
+      document.querySelectorAll(".key").forEach(key => {
+        key.disabled = true;
+      });
+    }
+
+    playAgainBtn.onclick = () => {
+      // Reset variables
+      currentGuess = 0;
+      currentLetters = [];
+      playAgainBtn.style.display = "none";
+      document.getElementById("message").textContent = "";
+
+      // Pick a new word
+      solution = WORDS[Math.floor(Math.random() * WORDS.length)].toUpperCase();
+
+      // Clear board
+      rows.forEach(tiles => {
+        tiles.forEach(tile => {
+          tile.textContent = "";
+          tile.className = "tile";
+        });
+      });
+
+      // Clear and re-enable keyboard
+      document.querySelectorAll(".key").forEach(key => {
+        key.classList.remove("correct", "present", "absent");
+        key.disabled = false;
+      });
+    };
+  </script>
+</body>
+</html>
+
